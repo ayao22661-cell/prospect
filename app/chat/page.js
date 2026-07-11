@@ -38,16 +38,18 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="container">
-      <nav>
-        <a href="/">Dashboard</a>
-        <a href="/chat">Chat</a>
-      </nav>
-      <h1>Chat de pilotage</h1>
-      <div className="card" style={{ padding: 0 }}>
+    <>
+      <div className="topbar">
+        <div>
+          <p className="page-eyebrow">Pilotage assisté</p>
+          <h1 className="page-title">Chat</h1>
+        </div>
+      </div>
+
+      <div className="chat-shell">
         <div className="chat-window">
           {messages.length === 0 && (
-            <p style={{ color: "#999", padding: 12 }}>
+            <p className="chat-hint">
               Exemples : "combien de prospects investisseurs ?", "envoie un email à jane@vc.com",
               "envoie à tous les nouveaux testeurs".
             </p>
@@ -73,6 +75,6 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
