@@ -2,6 +2,49 @@
 
 import { useEffect, useState } from "react";
 
+const STAGES = ["new", "sent", "failed", "unsubscribed"];
+const STAGE_LABELS = {
+  new: "Nouveau",
+  sent: "Envoyé",
+  failed: "Échec",
+  unsubscribed: "Désabonné",
+};
+
+function PipelineRail({ byStatus }) {
+  const total = STAGES.reduce((sum, s) => sum + (byStatus?.[s] || 0), 0);
+
+  return (
+    <div className="rail-card">
+      <div className="rail-heading">
+        <h2>Pipeline de prospection</h2>
+        <span>{total} prospect{total !== 1 ? "s" : ""} au total</span>
+      </div>
+      <div className="rail-track">
+        {STAGES.map((stage) => {
+          const count = byStatus?.[stage] || 0;
+          const pct = total > 0 ? (count / total) * 100 : 0;
+          return (
+            <div
+              key={stage}
+              className={`rail-seg ${stage}`}
+              style={{ flex: `${pct} 0 0%` }}
+              title={`${STAGE_LABELS[stage]}: ${count}`}
+            />
+          );
+        })}
+      </div>
+      <div className="rail-legend">
+        {STAGES.map((stage) => (
+          <div className="rail-legend-item" key={stage}>
+            <span className={`sw ${stage}`} />
+            {STAGE_LABELS[stage]} <strong>{byStatus?.[stage] || 0}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [prospects, setProspects] = useState([]);
@@ -41,68 +84,65 @@ export default function DashboardPage() {
   }, [filterStatus, filterType]);
 
   return (
-    <div className="container">
-      <nav>
-        <a href="/">Dashboard</a>
-        <a href="/chat">Chat</a>
-      </nav>
-      <h1>Kweni Prospect</h1>
+    <>
+      <div className="topbar">
+        <div>
+          <p className="page-eyebrow">Vue d'ensemble</p>
+          <h1 className="page-title">Dashboard</h1>
+        </div>
+        {stats && (
+          <div className="quota-pill">
+            <span className="live-dot" />
+            <strong>{stats.sentLast24h}</strong> / {stats.dailyLimit} envoyés (24h)
+          </div>
+        )}
+      </div>
 
-      {error && <div className="card" style={{ color: "#ff7b72" }}>Erreur : {error}</div>}
+      {error && (
+        <div className="card error-card">
+          <p>Erreur : {error}</p>
+        </div>
+      )}
 
       {stats && (
         <>
-          <div className="card">
-            <h2>Envoi (24h)</h2>
-            <p>
-              {stats.sentLast24h} / {stats.dailyLimit} emails envoyés sur les dernières 24h.
-            </p>
-          </div>
+          <PipelineRail byStatus={stats.byStatus} />
 
-          <div className="card">
-            <h2>Statuts</h2>
-            <div className="stat-grid">
-              {Object.entries(stats.byStatus || {}).map(([status, count]) => (
-                <div className="stat-box" key={status}>
-                  <div className="value">{count}</div>
-                  <div className="label">{status}</div>
-                </div>
-              ))}
+          <div className="grid-2">
+            <div className="card">
+              <h2>Par type</h2>
+              <div className="stat-grid">
+                {Object.entries(stats.byType || {}).map(([type, count]) => (
+                  <div className="stat-box" key={type}>
+                    <div className="value">{count}</div>
+                    <div className="label">{type}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="card">
-            <h2>Types</h2>
-            <div className="stat-grid">
-              {Object.entries(stats.byType || {}).map(([type, count]) => (
-                <div className="stat-box" key={type}>
-                  <div className="value">{count}</div>
-                  <div className="label">{type}</div>
-                </div>
-              ))}
+            <div className="card">
+              <h2>Dernier scraping quotidien</h2>
+              {stats.lastCronRun ? (
+                <p>
+                  {new Date(stats.lastCronRun.ran_at).toLocaleString("fr-FR")}
+                  <br />
+                  <span className={`badge ${stats.lastCronRun.status === "success" ? "success" : "failed"}`}>
+                    {stats.lastCronRun.status}
+                  </span>{" "}
+                  — {stats.lastCronRun.message}
+                </p>
+              ) : (
+                <p>Aucun passage enregistré pour l'instant.</p>
+              )}
             </div>
-          </div>
-
-          <div className="card">
-            <h2>Dernier passage du scraping quotidien</h2>
-            {stats.lastCronRun ? (
-              <p>
-                {new Date(stats.lastCronRun.ran_at).toLocaleString("fr-FR")} —{" "}
-                <span className={`badge ${stats.lastCronRun.status === "success" ? "new" : "failed"}`}>
-                  {stats.lastCronRun.status}
-                </span>{" "}
-                — {stats.lastCronRun.message}
-              </p>
-            ) : (
-              <p>Aucun passage enregistré pour l'instant.</p>
-            )}
           </div>
         </>
       )}
 
       <div className="card">
         <h2>Prospects</h2>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <div className="table-toolbar">
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="">Tous statuts</option>
             <option value="new">new</option>
@@ -120,7 +160,7 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <p>Chargement...</p>
+          <p style={{ color: "var(--text-dim)", fontSize: 13.5 }}>Chargement...</p>
         ) : (
           <table>
             <thead>
@@ -150,13 +190,15 @@ export default function DashboardPage() {
               ))}
               {prospects.length === 0 && (
                 <tr>
-                  <td colSpan={5}>Aucun prospect pour ce filtre.</td>
+                  <td colSpan={5} style={{ color: "var(--text-faint)" }}>
+                    Aucun prospect pour ce filtre.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         )}
       </div>
-    </div>
+    </>
   );
 }
